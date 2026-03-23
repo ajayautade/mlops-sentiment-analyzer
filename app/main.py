@@ -88,7 +88,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import os
 
 # Mount static files directory if it exists
 static_dir = os.path.join(os.path.dirname(__file__), "static")
