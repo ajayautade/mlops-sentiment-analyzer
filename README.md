@@ -250,7 +250,7 @@ The FastAPI application is now running on EKS with the new version:
 # User sends a prediction request
 curl -X POST http://<LOAD_BALANCER_URL>/predict \
   -H "Content-Type: application/json" \
-  -d '{"text": "I am so gratfull and happy with my name Ajay"}'
+  -d '{"text": "I am so grateful and happy with my name Ajay"}'
 
 # Response
 {
