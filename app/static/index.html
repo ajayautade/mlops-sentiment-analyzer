@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLOps Sentiment Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.js"></script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(-45deg, #0f172a, #1e1b4b, #312e81, #0f172a);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        .animated-input {
+            transition: all 0.3s ease;
+        }
+        .animated-input:focus {
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+            border-color: #6366f1;
+        }
+
+        .btn-glow {
+            transition: all 0.3s ease;
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .result-card {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .result-card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .confidence-bar-bg {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            overflow: hidden;
+            height: 8px;
+            width: 100%;
+        }
+
+        .confidence-bar-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+            width: 0%;
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+    <!-- Header -->
+    <div class="absolute top-6 left-6 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500 flex justify-center items-center shadow-lg shadow-indigo-500/30">
+            <i data-lucide="brain-circuit" class="text-white w-6 h-6"></i>
+        </div>
+        <div>
+            <h1 class="font-bold text-xl tracking-wide">Nexus AI</h1>
+            <p class="text-xs text-indigo-300 font-medium">MLOps Sentiment Engine</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="w-full max-w-2xl mt-16 md:mt-0 z-10">
+        
+        <!-- Input Panel -->
+        <div class="glass-panel rounded-3xl p-8 mb-6">
+            <h2 class="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
+                Analyze Sentiment
+            </h2>
+            <p class="text-slate-400 mb-6 text-sm">Enter a sentence or paragraph below to predict the emotional tone using the Fine-Tuned DistilBERT model.</p>
+            
+            <form id="predict-form" class="space-y-5">
+                <div class="relative">
+                    <textarea 
+                        id="user-input" 
+                        rows="4" 
+                        placeholder="I absolutely love the new features, but the onboarding process was frustrating..."
+                        class="animated-input w-full bg-slate-900/60 text-slate-100 rounded-2xl p-5 border border-slate-700/50 outline-none resize-none text-lg placeholder:text-slate-600"
+                        required></textarea>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="text-xs text-slate-500 flex items-center gap-1">
+                        <i data-lucide="shield-check" class="w-3 h-3"></i> Secure connection
+                    </div>
+                    
+                    <button type="submit" id="submit-btn" class="btn-glow bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-semibold py-3 px-8 rounded-xl flex items-center gap-2">
+                        <span>Analyze</span>
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Panel -->
+        <div id="result-container" class="result-card glass-panel rounded-3xl p-8 hidden">
+            
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <h3 class="text-slate-400 text-sm font-medium uppercase tracking-wider mb-1">Prediction Output</h3>
+                    <div class="flex items-center gap-3">
+                        <div id="sentiment-icon" class="w-12 h-12 rounded-full flex items-center justify-center">
+                            <!-- Icon injected via JS -->
+                        </div>
+                        <h2 id="sentiment-text" class="text-4xl font-bold tracking-tight">--</h2>
+                    </div>
+                </div>
+                
+                <div class="text-right">
+                    <p class="text-slate-500 text-xs uppercase tracking-wider mb-1">Latency</p>
+                    <p id="latency-text" class="text-emerald-400 font-mono text-xl">-- ms</p>
+                </div>
+            </div>
+
+            <!-- Confidence Meter -->
+            <div class="mb-4">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-sm font-medium text-slate-300">Confidence Score</span>
+                    <span id="confidence-percentage" class="text-lg font-bold font-mono text-indigo-300">0%</span>
+                </div>
+                <div class="confidence-bar-bg">
+                    <div id="confidence-bar" class="confidence-bar-fill bg-gradient-to-r from-indigo-500 to-fuchsia-500"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-5 border-t border-white/10 flex justify-between text-xs text-slate-500 font-mono">
+                <p>Model: <span class="text-slate-400">distilbert-sst-2</span></p>
+                <p id="timestamp" class="text-slate-400">--</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Background Elements -->
+    <div class="fixed top-20 right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+    <div class="fixed bottom-20 left-20 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        const form = document.getElementById('predict-form');
+        const input = document.getElementById('user-input');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnContent = submitBtn.innerHTML;
+        
+        const resultContainer = document.getElementById('result-container');
+        const sentimentText = document.getElementById('sentiment-text');
+        const sentimentIcon = document.getElementById('sentiment-icon');
+        const latencyText = document.getElementById('latency-text');
+        const confidencePercentage = document.getElementById('confidence-percentage');
+        const confidenceBar = document.getElementById('confidence-bar');
+        const timestamp = document.getElementById('timestamp');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const textToAnalyze = input.value.trim();
+            if(!textToAnalyze) return;
+
+            // UI Loading State
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 spinner"></i> <span class="opacity-80">Processing...</span>`;
+            lucide.createIcons();
+            
+            // Reset previous results
+            resultContainer.classList.remove('show');
+            confidenceBar.style.width = '0%';
+
+            try {
+                // Call actual FastAPI endpoints
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: textToAnalyze })
+                });
+
+                if(!response.ok) throw new Error("API Request Failed");
+
+                const data = await response.json();
+                
+                // Show Results container
+                resultContainer.classList.remove('hidden');
+                
+                // Short timeout to trigger CSS animations naturally
+                setTimeout(() => {
+                    resultContainer.classList.add('show');
+                    
+                    // Populate Data
+                    sentimentText.innerText = data.sentiment;
+                    latencyText.innerText = `${data.latency_ms.toFixed(1)} ms`;
+                    timestamp.innerText = new Date().toLocaleTimeString();
+                    
+                    const score = (data.confidence * 100).toFixed(1);
+                    confidencePercentage.innerText = `${score}%`;
+                    confidenceBar.style.width = `${score}%`;
+
+                    // Styling based on result
+                    if(data.sentiment === 'POSITIVE') {
+                        sentimentText.className = "text-4xl font-bold tracking-tight text-emerald-400";
+                        sentimentIcon.className = "w-12 h-12 rounded-full flex items-center justify-center bg-emerald-500/20 text-emerald-400";
+                        sentimentIcon.innerHTML = `<i data-lucide="smile" class="w-7 h-7"></i>`;
+                        confidenceBar.className = "confidence-bar-fill bg-gradient-to-r from-emerald-500 to-green-400";
+                    } else if (data.sentiment === 'NEGATIVE') {
+                        sentimentText.className = "text-4xl font-bold tracking-tight text-rose-400";
+                        sentimentIcon.className = "w-12 h-12 rounded-full flex items-center justify-center bg-rose-500/20 text-rose-400";
+                        sentimentIcon.innerHTML = `<i data-lucide="frown" class="w-7 h-7"></i>`;
+                        confidenceBar.className = "confidence-bar-fill bg-gradient-to-r from-rose-500 to-red-500";
+                    }
+
+                    lucide.createIcons();
+                }, 50);
+
+            } catch (error) {
+                console.error("Error calling predict endpoint: ", error);
+                alert("An error occurred while calling the AI model API.");
+            } finally {
+                // Reset Button State
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = btnContent;
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>

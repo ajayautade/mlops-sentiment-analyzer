@@ -20,8 +20,13 @@ def client():
 
 
 class TestRootEndpoint:
-    def test_root_returns_service_info(self, client):
+    def test_root_returns_html(self, client):
         response = client.get("/")
+        assert response.status_code == 200
+        assert "text/html" in response.headers.get("content-type", "")
+
+    def test_api_info_returns_service_info(self, client):
+        response = client.get("/api/info")
         assert response.status_code == 200
         data = response.json()
         assert data["service"] == "MLOps Sentiment Analyzer"

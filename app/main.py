@@ -11,7 +11,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 
@@ -85,6 +86,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+import os
+
+# Mount static files directory if it exists
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 # ──────────────────────── Endpoints ────────────────────────
@@ -217,9 +225,9 @@ async def metrics():
     )
 
 
-@app.get("/", tags=["General"])
-async def root():
-    """Root endpoint with API information."""
+@app.get("/api/info", tags=["General"])
+async def api_info():
+    """Information endpoint with API metadata."""
     return {
         "service": "MLOps Sentiment Analyzer",
         "version": MODEL_VERSION,
@@ -229,3 +237,12 @@ async def root():
         "model_info": "/model/info",
         "status": "running",
     }
+
+
+@app.get("/", tags=["General"])
+async def root():
+    """Root endpoint serves the Web GUI."""
+    static_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(static_file):
+        return FileResponse(static_file)
+    return await api_info()
