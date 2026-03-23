@@ -4,7 +4,7 @@ Tests the SentimentModel class directly without the FastAPI layer.
 """
 
 import pytest
-from app.model import SentimentModel, MODEL_NAME, MODEL_VERSION, SUPPORTED_LABELS
+from app.model import SentimentModel, SUPPORTED_LABELS
 
 
 @pytest.fixture(scope="module")
