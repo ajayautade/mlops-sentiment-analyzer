@@ -242,6 +242,25 @@ jobs:
           docker push ${{ steps.meta.outputs.tags }}
           docker push ${{ steps.meta.outputs.latest }}
 
+      # Authenticate securely with Docker Hub using Github Secrets
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Tag and push the exact same image to Docker Hub public registry
+      - name: Push to Docker Hub
+        run: |
+          DOCKERHUB_TAG="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          DOCKERHUB_LATEST="${{ secrets.DOCKERHUB_USERNAME }}/${{ env.ECR_REPOSITORY }}:latest"
+          
+          docker tag ${{ steps.meta.outputs.tags }} $DOCKERHUB_TAG
+          docker tag ${{ steps.meta.outputs.latest }} $DOCKERHUB_LATEST
+          
+          docker push $DOCKERHUB_TAG
+          docker push $DOCKERHUB_LATEST
+
   # ════════════════════════════════════════════════════════════════════
   # JOB 5: UPDATE K8s MANIFESTS (GitOps Trigger)
   # ════════════════════════════════════════════════════════════════════
