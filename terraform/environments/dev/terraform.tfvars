@@ -11,8 +11,8 @@ cluster_name    = "mlops-sentiment-dev"
 cluster_version = "1.31"
 vpc_cidr        = "10.0.0.0/16"
 
-# Smaller nodes for dev to save costs
-node_instance_types = ["t3.medium"]
+# m7i-flex.large: 2 vCPU, 8GB RAM — good for AI model serving
+node_instance_types = ["m7i-flex.large"]
 node_min_size       = 1
 node_max_size       = 3
 node_desired_size   = 2

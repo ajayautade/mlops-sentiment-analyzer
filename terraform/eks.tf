@@ -49,7 +49,7 @@ module "eks" {
       max_size     = var.node_max_size
       desired_size = var.node_desired_size
 
-      # t3.medium: 2 vCPU, 4GB RAM — sufficient for DistilBERT model serving
+      # m7i-flex.large: 2 vCPU, 8GB RAM — good for DistilBERT model serving
       instance_types = var.node_instance_types
       capacity_type  = "ON_DEMAND"
 

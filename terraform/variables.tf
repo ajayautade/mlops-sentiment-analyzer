@@ -50,7 +50,7 @@ variable "cluster_version" {
 variable "node_instance_types" {
   description = "EC2 instance types for EKS worker nodes"
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["m7i-flex.large"]
 }
 
 variable "node_min_size" {
