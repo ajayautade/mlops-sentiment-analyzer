@@ -5,6 +5,7 @@ A production-grade REST API serving a HuggingFace sentiment analysis model.
 Includes health checks, batch predictions, Prometheus metrics, and model info.
 """
 
+import os
 import time
 import logging
 from contextlib import asynccontextmanager
