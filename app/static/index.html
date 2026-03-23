@@ -163,6 +163,11 @@
                 <p id="timestamp" class="text-slate-400">--</p>
             </div>
         </div>
+        
+        <!-- Footer -->
+        <footer class="mt-12 text-center text-slate-500 text-sm z-10 w-full mb-4">
+            Developed by <span class="text-indigo-400 font-medium tracking-wide">Ajay Autade</span>
+        </footer>
     </main>
 
     <!-- Background Elements -->
@@ -246,7 +251,7 @@
 
             } catch (error) {
                 console.error("Error calling predict endpoint: ", error);
-                alert("An error occurred while calling the AI model API.");
+                alert("Error: " + error.message + "\nAre you sure you aren't looking at a cached page?");
             } finally {
                 // Reset Button State
                 submitBtn.disabled = false;
