@@ -69,7 +69,7 @@ spec:
           # This image is stored in AWS ECR (Elastic Container Registry)
           # Format: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/<REPO_NAME>:<TAG>
           # The tag is the Git commit SHA, updated automatically by GitHub Actions CI
-          image: 735395977162.dkr.ecr.ap-south-1.amazonaws.com/mlops-sentiment-api:latest
+          image: 735395977162.dkr.ecr.ap-south-1.amazonaws.com/mlops-sentiment-api:34db862e629c8287aa47175cf06816aee23e6b9b
           imagePullPolicy: Always  # Always pull latest (important for :latest and SHA tags)
 
           ports:
