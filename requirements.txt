@@ -1,0 +1,28 @@
+# ──────────────────────────────────────────────────────────────
+# MLOps Sentiment Analyzer — Python Dependencies
+# ──────────────────────────────────────────────────────────────
+# All versions pinned for reproducibility & compatibility.
+# Python 3.12 compatible. Last verified: March 2026.
+# ──────────────────────────────────────────────────────────────
+
+# Web Framework
+fastapi==0.115.8
+uvicorn[standard]==0.34.0
+
+# AI/ML
+transformers==4.49.0
+torch==2.6.0
+sentencepiece==0.2.0
+
+# Data Validation (Pydantic V2 — required by FastAPI 0.115+)
+pydantic==2.10.6
+
+# Monitoring
+prometheus-client==0.21.1
+
+# Testing
+pytest==8.3.5
+httpx==0.28.1
+
+# Utilities
+python-multipart==0.0.20

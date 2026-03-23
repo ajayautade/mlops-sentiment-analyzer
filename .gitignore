@@ -1,0 +1,51 @@
+# ──────────────────────────────────────────────────────────────
+# MLOps Sentiment Analyzer — .gitignore
+# ──────────────────────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+!terraform/environments/
+
+# Environment files
+.env
+.env.*
+
+# HuggingFace model cache (don't commit models to git)
+*.bin
+*.safetensors
+.cache/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Logs
+*.log
