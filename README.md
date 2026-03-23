@@ -736,6 +736,24 @@ Prometheus automatically discovers and scrapes pods via the `ServiceMonitor`:
 | Max Nodes | 3 | 5 |
 | Desired Nodes | 2 | 3 |
 | VPC CIDR | 10.0.0.0/16 | 10.1.0.0/16 |
+ 
+ ---
+ 
+## 📸 Infrastructure Screenshots
+
+### AWS EKS Cluster
+Live status of the Managed Kubernetes Cluster in `ap-south-1`.
+![EKS Cluster Active](docs/screenshots/aws_eks_cluster_active.png)
+
+### AWS ECR Repository & Images
+Private Docker registry with automated lifecycle management.
+![ECR Private Repo](docs/screenshots/aws_ecr_private_repo.png)
+![ECR Image List](docs/screenshots/aws_ecr_image_list.png)
+
+### ECR Lifecycle & Governance
+Infrastructure-as-Code (Terraform) managed policies for container rotation and tagging.
+![ECR Lifecycle](docs/screenshots/aws_ecr_lifecycle_policy.png)
+![ECR Repository Tags](docs/screenshots/aws_ecr_repository_tags.png)
 
 ---
 
