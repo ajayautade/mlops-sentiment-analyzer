@@ -250,11 +250,11 @@ The FastAPI application is now running on EKS with the new version:
 # User sends a prediction request
 curl -X POST http://<LOAD_BALANCER_URL>/predict \
   -H "Content-Type: application/json" \
-  -d '{"text": "I love this product!"}'
+  -d '{"text": "I am so gratfull and happy with my name Ajay"}'
 
 # Response
 {
-  "text": "I love this product!",
+  "text": "I am so grateful and happy with my name Ajay",
   "sentiment": "POSITIVE",
   "confidence": 0.9998,
   "model_name": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
@@ -497,13 +497,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```bash
 curl -X POST http://localhost:8080/predict \
   -H "Content-Type: application/json" \
-  -d '{"text": "I love this product! It is amazing!"}'
+  -d '{"text": "I am so grateful and happy with my name Ajay"}'
 ```
 
 **Response:**
 ```json
 {
-  "text": "I love this product! It is amazing!",
+  "text": "I am so grateful and happy with my name Ajay",
   "sentiment": "POSITIVE",
   "confidence": 0.9998,
   "model_name": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
