@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
-
 # ──────────────────────── Request Models ────────────────────────
 
 
@@ -41,7 +40,9 @@ class SentimentResult(BaseModel):
     """Individual sentiment analysis result."""
 
     text: str = Field(..., description="Original input text")
-    sentiment: str = Field(..., description="Predicted sentiment label (POSITIVE/NEGATIVE)")
+    sentiment: str = Field(
+        ..., description="Predicted sentiment label (POSITIVE/NEGATIVE)"
+    )
     confidence: float = Field(
         ..., ge=0.0, le=1.0, description="Confidence score for the prediction"
     )
@@ -75,9 +76,13 @@ class HealthResponse(BaseModel):
     """Response for health check endpoint."""
 
     status: str = Field(..., description="Service health status")
-    model_loaded: bool = Field(..., description="Whether the AI model is loaded and ready")
+    model_loaded: bool = Field(
+        ..., description="Whether the AI model is loaded and ready"
+    )
     model_name: Optional[str] = Field(None, description="Name of the loaded model")
-    model_version: str = Field(..., description="Version of the model serving application")
+    model_version: str = Field(
+        ..., description="Version of the model serving application"
+    )
     uptime_seconds: float = Field(..., description="Service uptime in seconds")
 
 

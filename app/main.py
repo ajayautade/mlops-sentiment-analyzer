@@ -15,7 +15,14 @@ from fastapi.responses import JSONResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 
-from app.model import model, MODEL_NAME, MODEL_VERSION, MODEL_TASK, MAX_INPUT_LENGTH, SUPPORTED_LABELS
+from app.model import (
+    model,
+    MODEL_NAME,
+    MODEL_VERSION,
+    MODEL_TASK,
+    MAX_INPUT_LENGTH,
+    SUPPORTED_LABELS,
+)
 from app.schemas import (
     PredictionRequest,
     PredictionResponse,
@@ -110,7 +117,9 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
-@app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["Predictions"])
+@app.post(
+    "/predict/batch", response_model=BatchPredictionResponse, tags=["Predictions"]
+)
 async def predict_batch(request: BatchPredictionRequest):
     """
     Run sentiment analysis on a batch of texts (max 32).
@@ -146,7 +155,9 @@ async def predict_batch(request: BatchPredictionRequest):
         raise HTTPException(status_code=503, detail=f"Model not ready: {e}")
     except Exception as e:
         logger.error(f"Batch prediction failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Batch prediction failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Batch prediction failed: {str(e)}"
+        )
 
 
 @app.get("/health", response_model=HealthResponse, tags=["Operations"])

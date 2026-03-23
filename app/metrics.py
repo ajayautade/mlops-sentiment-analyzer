@@ -5,7 +5,6 @@ These metrics are scraped by Prometheus and visualized in Grafana.
 
 from prometheus_client import Counter, Histogram, Gauge, Info
 
-
 # ──────────────────────── Counters ────────────────────────
 
 # Total number of prediction requests (by sentiment label and status)

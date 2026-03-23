@@ -132,9 +132,7 @@ class SentimentModel:
 
         except Exception as e:
             PREDICTION_ERRORS_TOTAL.labels(error_type="inference_failure").inc()
-            PREDICTION_REQUESTS_TOTAL.labels(
-                sentiment="unknown", status="error"
-            ).inc()
+            PREDICTION_REQUESTS_TOTAL.labels(sentiment="unknown", status="error").inc()
             logger.error(f"Inference error: {e}")
             raise
 
