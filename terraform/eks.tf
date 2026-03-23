@@ -43,7 +43,7 @@ module "eks" {
   # ──────────── Managed Node Group ────────────
   eks_managed_node_groups = {
     ml_workers = {
-      name = "${var.project_name}-nodes"
+      name = "ml-nodes-v2"
 
       min_size     = var.node_min_size
       max_size     = var.node_max_size
@@ -57,7 +57,7 @@ module "eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       # Disk size for model cache + container images
-      disk_size = 30
+      disk_size = 60
 
       labels = {
         role        = "ml-worker"

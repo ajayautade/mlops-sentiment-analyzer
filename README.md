@@ -40,8 +40,10 @@ This project demonstrates a **complete AI DevOps (MLOps) pipeline** by deploying
 - **Infrastructure as Code** — All AWS resources (VPC, EKS, ECR, S3) provisioned through modular Terraform
 - **GitOps Continuous Delivery** — ArgoCD watches the GitHub repo and auto-deploys any changes to the K8s cluster
 - **CI Pipeline** — GitHub Actions runs tests, linting, security scanning, builds, and pushes images on every commit
+- **Interactive Web GUI** — A beautifully designed, glassmorphism-styled frontend built with Tailwind CSS and Vanilla JS to interact with the AI instantaneously from your browser window!
 - **Auto-Scaling** — Horizontal Pod Autoscaler scales AI pods 2→10 based on real-time CPU/Memory usage
 - **Monitoring** — Prometheus scrapes custom AI metrics (inference latency, confidence scores, prediction count) and Grafana visualizes them
+- **Troubleshooting Guide** — Comprehensive documentation of real-world deployment issues mapping solutions for EKS constraints, disk limits, and Docker builds: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ### Why This Project Stands Out
 
@@ -571,7 +573,15 @@ kubectl port-forward svc/argocd-server -n argocd 8443:443
 | `GET` | `/docs` | Interactive Swagger UI | Open in browser |
 | `GET` | `/redoc` | ReDoc API documentation | Open in browser |
 
-### Single Prediction
+### Web GUI Interface
+
+The project includes an **Interactive Web Dashboard** natively served by the FastAPI application.
+Open your browser to the LoadBalancer's URL or `http://localhost:8080/` to access the sleek, dark-mode GUI.
+- Type any sentence into the text box and click **Analyze**.
+- The frontend will utilize native asynchronous hooks to request insights from the `/predict` backend endpoint.
+- Displays inference latency in `ms`, real-time `POSITIVE/NEGATIVE` status, and confidence percentage bars.
+
+### Single Prediction via Terminal
 
 ```bash
 curl -X POST http://localhost:8080/predict \

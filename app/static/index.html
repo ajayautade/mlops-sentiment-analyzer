@@ -194,7 +194,10 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const textToAnalyze = input.value.trim();
-            if(!textToAnalyze) return;
+            if(!textToAnalyze) {
+                alert("Please type a sentence into the text box before clicking Analyze!");
+                return;
+            }
 
             // UI Loading State
             submitBtn.disabled = true;
