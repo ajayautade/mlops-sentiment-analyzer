@@ -16,8 +16,14 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
+# We install CPU-only PyTorch first (from PyTorch's CPU wheel index)
+# because our EKS nodes don't have GPUs, so the full CUDA-enabled
+# PyTorch (~800MB) is unnecessary. CPU-only is ~200MB — smaller image,
+# faster builds, and avoids download timeouts.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install \
+    torch==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Pre-download the HuggingFace model during build
 # This avoids downloading on every container start (faster cold starts)
