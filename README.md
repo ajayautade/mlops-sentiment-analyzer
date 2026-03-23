@@ -744,6 +744,7 @@ Prometheus automatically discovers and scrapes pods via the `ServiceMonitor`:
 ### 🟢 Automated CI/CD Pipeline
 The entire pipeline (Lint -> Test -> Security -> Build -> Deploy) is fully automated with GitHub Actions.
 ![CI Success](docs/screenshots/github_actions_ci_success.png)
+![Workflow History](docs/screenshots/github_actions_workflow_history.png)
 
 ### 🟢 Terminal API Validation
 Inference results showing high-confidence sentiment predictions via `curl`.
@@ -762,6 +763,9 @@ The final "Nexus AI" interface in action, designed by **Ajay Autade**.
 ### AWS EKS Cluster
 Live status of the Managed Kubernetes Cluster in `ap-south-1`.
 ![EKS Cluster Active](docs/screenshots/aws_eks_cluster_active.png)
+![EKS Node Compute](docs/screenshots/aws_eks_node_compute_status.png)
+![EKS Node Group Details](docs/screenshots/aws_eks_node_group_details.png)
+![EKS Node Instance Types](docs/screenshots/aws_eks_node_instance_types.png)
 
 ### AWS ECR Repository & Images
 Private Docker registry with automated lifecycle management.
