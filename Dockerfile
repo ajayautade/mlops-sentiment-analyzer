@@ -20,17 +20,15 @@ RUN apt-get update && \
 # because our EKS nodes don't have GPUs, so the full CUDA-enabled
 # PyTorch (~800MB) is unnecessary. CPU-only is ~200MB — smaller image,
 # faster builds, and avoids download timeouts.
-COPY requirements.txt .
+COPY requirements.txt download_model.py .
 RUN pip install --no-cache-dir --prefix=/install \
     torch==2.6.0+cpu --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Pre-download the HuggingFace model during build
 # This avoids downloading on every container start (faster cold starts)
-RUN python -c "\
-    from transformers import pipeline; \
-    p = pipeline('sentiment-analysis', model='distilbert/distilbert-base-uncased-finetuned-sst-2-english'); \
-    print('Model downloaded successfully')"
+ENV PYTHONPATH=/install/lib/python3.12/site-packages:$PYTHONPATH
+RUN python download_model.py
 
 
 # ==================== Stage 2: Production ====================
