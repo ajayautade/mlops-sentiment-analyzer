@@ -1,0 +1,44 @@
+# ==============================================================================
+# Kubernetes Service — MLOps Sentiment Analyzer
+# ==============================================================================
+#
+# PURPOSE:
+#   A Service is like a "front door" for your pods. Since pods can be created
+#   and destroyed (scaling, updates), their IP addresses change constantly.
+#   The Service provides a stable IP/DNS name that always routes to healthy pods.
+#
+# HOW IT WORKS:
+#   1. The Service finds pods using selector: app: sentiment-analyzer
+#   2. It load-balances traffic across all matching pods
+#   3. type: LoadBalancer creates an AWS ELB (Elastic Load Balancer)
+#   4. The ELB gets a public URL that you can use to access the API
+#
+# ACCESSING THE API:
+#   After deployment, run:
+#     kubectl get svc -n mlops
+#   This shows the EXTERNAL-IP (ELB URL) where you can send requests:
+#     curl -X POST http://<EXTERNAL-IP>/predict -d '{"text": "I love this!"}'
+#
+# ==============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentiment-analyzer
+  namespace: mlops
+  labels:
+    app: sentiment-analyzer    # For organizational purposes
+spec:
+  # LoadBalancer: Creates an AWS Elastic Load Balancer (ELB) for external access
+  # Other options: ClusterIP (internal only), NodePort (static port on each node)
+  type: LoadBalancer
+
+  # Route traffic to pods with this label
+  selector:
+    app: sentiment-analyzer
+
+  ports:
+    - name: http               # Named port — referenced by ServiceMonitor for Prometheus
+      port: 80                 # External port (what users connect to)
+      targetPort: 8080         # Internal port (what the container listens on)
+      protocol: TCP

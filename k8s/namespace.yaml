@@ -1,0 +1,30 @@
+# ==============================================================================
+# Namespace — MLOps Application
+# ==============================================================================
+#
+# PURPOSE:
+#   A Namespace is like a "folder" in Kubernetes. It isolates our AI
+#   application resources from other workloads running on the same cluster
+#   (like ArgoCD in the "argocd" namespace, or monitoring in "monitoring").
+#
+# WHY "mlops"?
+#   All our application resources (Deployment, Service, HPA, ConfigMap,
+#   ServiceMonitor) live in the "mlops" namespace. This makes it easy to:
+#   - View all app resources: kubectl get all -n mlops
+#   - Delete everything:      kubectl delete namespace mlops
+#   - Apply RBAC policies to this namespace specifically
+#
+# NOTE:
+#   ArgoCD can also create this namespace automatically if you set
+#   syncOptions: CreateNamespace=true in the ArgoCD Application manifest.
+#   We define it here for explicitness and to add labels.
+#
+# ==============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops
+  labels:
+    app: sentiment-analyzer     # Identifies this namespace belongs to our app
+    monitoring: enabled          # Tells Prometheus to watch resources in this namespace

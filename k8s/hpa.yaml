@@ -1,0 +1,88 @@
+# ==============================================================================
+# Horizontal Pod Autoscaler (HPA) — MLOps Sentiment Analyzer
+# ==============================================================================
+#
+# PURPOSE:
+#   Automatically scales the number of AI model pods based on real-time
+#   CPU and memory usage. This is critical for AI workloads because
+#   inference traffic can spike unpredictably.
+#
+# HOW IT WORKS:
+#   1. HPA monitors CPU and memory metrics of the sentiment-analyzer pods
+#   2. If average CPU > 70% across all pods → scale UP (add more pods)
+#   3. If average CPU < 70% for 5 minutes → scale DOWN (remove pods)
+#   4. Scale range: minimum 2 pods, maximum 10 pods
+#
+# WHY THESE SETTINGS?
+#   - minReplicas: 2 → Always have 2 pods for high availability
+#   - maxReplicas: 10 → Cap to prevent runaway costs
+#   - CPU target 70% → Leave headroom for inference spikes
+#   - Memory target 80% → AI models use a lot of memory, so higher threshold
+#   - Scale up fast (60s) → Quickly handle traffic spikes
+#   - Scale down slow (300s) → Avoid thrashing (scaling up/down repeatedly)
+#
+# SCALING EXAMPLE:
+#   Normal:     [pod1] [pod2]                        (2 pods, CPU ~40%)
+#   Spike:      [pod1] [pod2] [pod3] [pod4]          (4 pods, CPU was >70%)
+#   More load:  [pod1] [pod2] ... [pod10]            (10 pods, max)
+#   After spike: Gradual scale down over ~10 minutes back to 2 pods
+#
+# ==============================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sentiment-analyzer-hpa
+  namespace: mlops
+  labels:
+    app: sentiment-analyzer
+spec:
+  # Which Deployment to scale
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sentiment-analyzer
+
+  # Scale range: always have at least 2 pods, never more than 10
+  minReplicas: 2
+  maxReplicas: 10
+
+  # ──────── Scaling Metrics ────────
+  metrics:
+    # Metric 1: CPU Utilization
+    # When average CPU across all pods exceeds 70%, add more pods
+    # DistilBERT inference is CPU-intensive, so this is the primary trigger
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Metric 2: Memory Utilization
+    # When average memory exceeds 80%, add more pods
+    # AI models consume significant memory; this catches memory pressure
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+  # ──────── Scaling Behavior ────────
+  behavior:
+    # Scale UP quickly — AI traffic can spike suddenly
+    scaleUp:
+      stabilizationWindowSeconds: 60      # Wait 60s before scaling up again
+      policies:
+        - type: Pods
+          value: 2                         # Add up to 2 pods at a time
+          periodSeconds: 60                # Can add 2 pods every 60 seconds
+
+    # Scale DOWN slowly — avoid removing pods that might be needed soon
+    scaleDown:
+      stabilizationWindowSeconds: 300      # Wait 5 minutes of low usage before scaling down
+      policies:
+        - type: Pods
+          value: 1                         # Remove only 1 pod at a time
+          periodSeconds: 120               # Can remove 1 pod every 2 minutes

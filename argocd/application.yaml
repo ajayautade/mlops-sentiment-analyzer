@@ -1,0 +1,86 @@
+# ==============================================================================
+# ArgoCD Application — MLOps Sentiment Analyzer
+# ==============================================================================
+#
+# PURPOSE:
+#   This is the core of the GitOps pipeline. It tells ArgoCD:
+#   "Watch this GitHub repository, and whenever the Kubernetes manifests
+#    in the k8s/ directory change, automatically deploy them to the cluster."
+#
+# HOW THE GITOPS FLOW WORKS:
+#   1. GitHub Actions CI builds a new Docker image and pushes to ECR
+#   2. CI updates the image tag in k8s/deployment.yaml and commits to Git
+#   3. ArgoCD (running on the EKS cluster) polls this GitHub repo every ~3 min
+#   4. ArgoCD detects the change in k8s/deployment.yaml
+#   5. ArgoCD compares desired state (Git) vs actual state (cluster)
+#   6. ArgoCD automatically applies the difference (sync)
+#   7. Kubernetes performs a rolling update → zero-downtime deployment!
+#
+# KEY CONCEPTS:
+#   - "Single Source of Truth": Git is the ONLY place where the desired
+#     cluster state is defined. No manual kubectl apply allowed.
+#   - "Self-Heal": If someone manually changes something on the cluster,
+#     ArgoCD will automatically revert it to match Git.
+#   - "Prune": If a resource is deleted from Git, ArgoCD will also
+#     delete it from the cluster.
+#
+# HOW TO APPLY:
+#   kubectl apply -f argocd/application.yaml
+#
+# HOW TO CHECK STATUS:
+#   kubectl get applications -n argocd
+#   Or open the ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8443:443
+#
+# ==============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-sentiment-analyzer
+  namespace: argocd              # ArgoCD Applications always live in the argocd namespace
+  labels:
+    app: sentiment-analyzer
+  # Finalizer ensures that when you delete this Application, ArgoCD also
+  # cleans up all the Kubernetes resources it created (deployment, service, etc.)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Project: default is ArgoCD's built-in project. For production, create
+  # a custom project with RBAC restrictions.
+  project: default
+
+  # ──────────── Source: GitHub Repository ────────────
+  # This is where ArgoCD looks for Kubernetes manifests.
+  # It watches the k8s/ directory on the main branch.
+  source:
+    repoURL: https://github.com/ajayautade/mlops-sentiment-analyzer.git
+    targetRevision: main         # Branch to watch
+    path: k8s                     # Directory containing all K8s manifests
+
+  # ──────────── Destination: EKS Cluster ────────────
+  # Where to deploy the manifests.
+  # "https://kubernetes.default.svc" means "this same cluster where ArgoCD is running"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops              # Deploy into the mlops namespace
+
+  # ──────────── Sync Policy: Automated GitOps ────────────
+  syncPolicy:
+    automated:
+      prune: true                 # DELETE resources removed from Git
+      selfHeal: true              # REVERT manual changes on cluster to match Git
+      allowEmpty: false           # Don't sync if the source directory is empty (safety)
+
+    syncOptions:
+      - CreateNamespace=true                    # Create mlops namespace if it doesn't exist
+      - PrunePropagationPolicy=foreground       # Wait for dependent resources to be deleted
+      - PruneLast=true                           # Delete old resources after new ones are healthy
+
+    # Retry policy: if sync fails, retry up to 3 times with exponential backoff
+    # Useful for transient errors (e.g., API server briefly unavailable)
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s              # First retry after 5 seconds
+        factor: 2                  # Double the wait time each retry (5s → 10s → 20s)
+        maxDuration: 3m            # Never wait more than 3 minutes

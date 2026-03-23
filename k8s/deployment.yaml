@@ -1,0 +1,151 @@
+# ==============================================================================
+# Kubernetes Deployment — MLOps Sentiment Analyzer
+# ==============================================================================
+#
+# PURPOSE:
+#   This file defines how the AI sentiment analysis application is deployed
+#   on the Kubernetes (EKS) cluster. It creates pods that run the Docker
+#   container with the FastAPI + HuggingFace model inside.
+#
+# HOW IT WORKS:
+#   1. Kubernetes creates 2 replica pods (for high availability)
+#   2. Each pod pulls the Docker image from AWS ECR
+#   3. The container starts, loads the AI model (~20 seconds)
+#   4. Once the readiness probe passes, the pod receives traffic
+#   5. On updates: rolling strategy ensures zero-downtime deployments
+#
+# IMAGE TAG:
+#   The `image:` field below is automatically updated by the GitHub Actions
+#   CI pipeline (Job 5: update-k8s). When CI pushes a new image to ECR,
+#   it updates the tag here with the Git commit SHA. ArgoCD then detects
+#   this change and syncs the new version to the cluster.
+#
+# RESOURCE SIZING:
+#   The DistilBERT model requires ~250MB RAM for weights + ~250MB for
+#   inference overhead. We request 512Mi and cap at 1Gi to prevent
+#   memory leaks from consuming node resources.
+#
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-analyzer
+  namespace: mlops
+  labels:
+    app: sentiment-analyzer    # Used by Service and HPA to find these pods
+    version: v1                # Useful for canary deployments later
+spec:
+  replicas: 2                   # Start with 2 pods for high availability
+  selector:
+    matchLabels:
+      app: sentiment-analyzer   # Must match template.metadata.labels
+  
+  # ──────── Rolling Update Strategy ────────
+  # This ensures zero-downtime deployments:
+  # - maxSurge: 1      → Create 1 extra pod before removing old ones
+  # - maxUnavailable: 0 → Never reduce below desired count during update
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  template:
+    metadata:
+      labels:
+        app: sentiment-analyzer
+        version: v1
+      # These annotations tell Prometheus where to scrape metrics from this pod
+      annotations:
+        prometheus.io/scrape: "true"     # Enable Prometheus scraping
+        prometheus.io/port: "8080"       # Port where /metrics is exposed
+        prometheus.io/path: "/metrics"   # Path to the Prometheus metrics endpoint
+    spec:
+      containers:
+        - name: sentiment-analyzer
+
+          # ──────── Container Image ────────
+          # This image is stored in AWS ECR (Elastic Container Registry)
+          # Format: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/<REPO_NAME>:<TAG>
+          # The tag is the Git commit SHA, updated automatically by GitHub Actions CI
+          image: 735395977162.dkr.ecr.ap-south-1.amazonaws.com/mlops-sentiment-api:latest
+          imagePullPolicy: Always  # Always pull latest (important for :latest and SHA tags)
+
+          ports:
+            - containerPort: 8080  # The port our FastAPI app listens on (set in Dockerfile)
+              name: http           # Named port — referenced by Service and ServiceMonitor
+              protocol: TCP
+
+          # ──────── Environment Variables ────────
+          # Injected from the ConfigMap (k8s/configmap.yaml)
+          # This allows changing config without rebuilding the Docker image
+          envFrom:
+            - configMapRef:
+                name: sentiment-analyzer-config
+
+          # ──────── Resource Requests & Limits ────────
+          # requests: Guaranteed resources — K8s scheduler uses this for pod placement
+          # limits:   Maximum resources — pod gets OOM killed if it exceeds memory limit
+          #
+          # Why these values?
+          #   CPU 500m request:  DistilBERT inference is CPU-bound, needs half a core minimum
+          #   CPU 1000m limit:   Cap at 1 full core to prevent starving other pods
+          #   Memory 512Mi req:  Model weights (~250MB) + FastAPI + Python overhead
+          #   Memory 1Gi limit:  Safety cap for batch predictions and concurrent requests
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          # ──────── Startup Probe ────────
+          # PURPOSE: Give the container time to download and load the AI model
+          # The model takes ~15-20 seconds to load into memory on first start.
+          # Without this probe, K8s might restart the container thinking it's broken.
+          # Max wait: initialDelaySeconds + (failureThreshold × periodSeconds) = 10 + 30×5 = 160s
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10    # Wait 10s before first check
+            periodSeconds: 5           # Check every 5 seconds
+            failureThreshold: 30       # Allow up to 30 failures (150s total)
+
+          # ──────── Readiness Probe ────────
+          # PURPOSE: Is the model loaded and ready to serve predictions?
+          # Kubernetes will NOT send traffic to this pod until readiness passes.
+          # The /health endpoint returns 200 only when model.is_loaded == True
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30    # Model takes ~20s to load after container starts
+            periodSeconds: 10          # Check every 10 seconds
+            timeoutSeconds: 5          # Timeout after 5 seconds (inference might be slow)
+            failureThreshold: 3        # After 3 failures, stop sending traffic
+
+          # ──────── Liveness Probe ────────
+          # PURPOSE: Is the container still responsive? (catches deadlocks/crashes)
+          # If this fails, K8s restarts the container automatically.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60    # Wait 60s (model must be loaded first)
+            periodSeconds: 15          # Check every 15 seconds
+            timeoutSeconds: 5
+            failureThreshold: 3        # Restart after 3 consecutive failures
+
+      # ──────── Topology Spread ────────
+      # Spread pods across different nodes for high availability.
+      # If one node goes down, pods on other nodes keep serving.
+      topologySpreadConstraints:
+        - maxSkew: 1                              # Max difference between node pod counts
+          topologyKey: kubernetes.io/hostname      # Spread across nodes (not AZs)
+          whenUnsatisfiable: DoNotSchedule         # Don't schedule if would cause imbalance
+          labelSelector:
+            matchLabels:
+              app: sentiment-analyzer

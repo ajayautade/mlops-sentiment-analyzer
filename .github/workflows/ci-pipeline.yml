@@ -1,0 +1,302 @@
+# ==============================================================================
+# GitHub Actions CI Pipeline — MLOps Sentiment Analyzer
+# ==============================================================================
+#
+# PURPOSE:
+#   Automates the entire build-test-deploy cycle. When you push code to the
+#   main branch, this pipeline ensures the code is tested, secure, and deployed.
+#
+# HOW THE GITOPS FLOW WORKS:
+#   1. Developer pushes code to main branch
+#   2. This pipeline runs 5 jobs in sequence:
+#      Job 1: Run pytest tests (fail fast on broken code)
+#      Job 2: Lint with flake8 + black (enforce code quality)
+#      Job 3: Trivy security scan (catch vulnerabilities early)
+#      Job 4: Build Docker image → Push to AWS ECR
+#      Job 5: Update image tag in k8s/deployment.yaml → Git commit & push
+#   3. ArgoCD (running on EKS) detects the Git change in step 5
+#   4. ArgoCD auto-syncs → Rolling update on the EKS cluster
+#   5. New pods start with the new image → Zero-downtime deployment!
+#
+# IMPORTANT:
+#   Job 5 (update-k8s) is the GitOps trigger. By committing the new image tag
+#   back to this repository, we trigger ArgoCD to sync the change to the cluster.
+#   This is the "single source of truth" pattern — Git always reflects the
+#   desired state of the cluster.
+#
+# REQUIRED GITHUB SECRETS:
+#   - AWS_ACCESS_KEY_ID:     IAM access key with ECR + EKS permissions
+#   - AWS_SECRET_ACCESS_KEY: Corresponding IAM secret key
+#
+# ==============================================================================
+
+name: CI Pipeline
+
+# ──────────── Trigger Configuration ────────────
+# When does this pipeline run?
+on:
+  push:
+    branches: [main]          # Run on pushes to main branch
+    paths-ignore:             # Skip pipeline if only these files changed (no code change)
+      - "**.md"               # Documentation changes don't need a rebuild
+      - "docs/**"             # Same for docs directory
+      - "terraform/**"        # Infrastructure changes are handled separately
+  pull_request:
+    branches: [main]          # Also run on PRs targeting main (for validation)
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "terraform/**"
+
+# ──────────── Environment Variables ────────────
+# Shared across all jobs — keeps things DRY (Don't Repeat Yourself)
+env:
+  AWS_REGION: ap-south-1                       # Mumbai region (closest to India)
+  ECR_REPOSITORY: mlops-sentiment-api           # ECR repository name (created by Terraform)
+  EKS_CLUSTER_NAME: mlops-sentiment-dev         # EKS cluster name (must match Terraform)
+
+# ──────────── Permissions ────────────
+# GitHub Actions needs these permissions:
+#   contents: write  → To commit updated image tag back to the repo (Job 5)
+#   id-token: write  → For OIDC authentication (if using IAM roles for GitHub Actions)
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  # ════════════════════════════════════════════════════════════════════
+  # JOB 1: TEST
+  # ════════════════════════════════════════════════════════════════════
+  # Runs the pytest test suite to catch bugs before building.
+  # If any test fails, the entire pipeline stops here.
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1.1: Clone the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 1.2: Install Python 3.12 (matches our Dockerfile and requirements.txt)
+      # cache: "pip" speeds up subsequent runs by caching downloaded packages
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      # Step 1.3: Install all Python dependencies from requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Step 1.4: Run all 24 tests (12 API tests + 12 model tests)
+      # -v: verbose output (shows each test name and result)
+      # --tb=short: shorter traceback on failures (easier to read in CI logs)
+      - name: Run tests
+        run: pytest app/tests/ -v --tb=short
+
+  # ════════════════════════════════════════════════════════════════════
+  # JOB 2: LINT
+  # ════════════════════════════════════════════════════════════════════
+  # Enforces consistent code style using flake8 and black.
+  # Runs in parallel with Job 1 (no dependency) for faster pipeline.
+  lint:
+    name: 🔍 Lint Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Install linting tools (not in requirements.txt because they're dev-only)
+      - name: Install linters
+        run: pip install flake8 black
+
+      # flake8: Checks for Python code style issues
+      # --max-line-length=100: Allow up to 100 chars per line (default 79 is too strict)
+      # --ignore=E501,W503: Ignore line-too-long and line-break-before-binary-operator
+      - name: Run flake8
+        run: flake8 app/ --max-line-length=100 --ignore=E501,W503
+
+      # black --check: Verifies code is formatted consistently
+      # Does NOT modify files — just fails if formatting is wrong
+      # Developer must run `black app/` locally before pushing
+      - name: Check formatting with Black
+        run: black --check app/
+
+  # ════════════════════════════════════════════════════════════════════
+  # JOB 3: SECURITY SCAN
+  # ════════════════════════════════════════════════════════════════════
+  # Scans the codebase for known vulnerabilities using Trivy.
+  # Runs AFTER tests pass (needs: [test]) to avoid wasting CI minutes
+  # on code that doesn't even work.
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: [test]              # Only run if tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Trivy scans the filesystem for:
+      #   - Known CVEs in Python packages
+      #   - Hardcoded secrets/credentials
+      #   - Misconfigurations
+      # severity: Only flag CRITICAL and HIGH issues (ignore LOW/MEDIUM)
+      # exit-code: "1" means the job FAILS if vulnerabilities are found
+      # ignore-unfixed: Skip vulnerabilities that have no fix available yet
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          ignore-unfixed: true
+
+  # ════════════════════════════════════════════════════════════════════
+  # JOB 4: BUILD & PUSH TO AWS ECR
+  # ════════════════════════════════════════════════════════════════════
+  # Builds the Docker image and pushes it to AWS ECR (Elastic Container
+  # Registry). Only runs on pushes to main (not on PRs) because we only
+  # want to push production images from the main branch.
+  #
+  # WHY ECR?
+  #   - Private registry (secure, no public exposure)
+  #   - Native integration with EKS (no extra auth needed)
+  #   - Automatic vulnerability scanning on push (configured in Terraform)
+  #   - Lifecycle policies auto-delete old images (saves storage costs)
+  build-and-push:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]   # Only build if ALL checks pass
+    # Only run on direct pushes to main (not on pull requests)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}  # Pass image tag to Job 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate with AWS using IAM credentials stored in GitHub Secrets
+      # This allows us to push images to ECR and interact with AWS services
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Log in to ECR — this generates a temporary Docker auth token
+      # The token is valid for 12 hours and allows pushing/pulling images
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Generate image tags:
+      #   1. Commit SHA tag (e.g., :abc123def) — unique, immutable
+      #   2. :latest tag — always points to the most recent build
+      - name: Generate image metadata
+        id: meta
+        run: |
+          IMAGE_TAG="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          LATEST_TAG="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"
+          echo "tags=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "latest=${LATEST_TAG}" >> $GITHUB_OUTPUT
+
+      # Build the multi-stage Docker image
+      # - Stage 1 (builder): Installs deps + downloads HuggingFace model
+      # - Stage 2 (production): Slim image with only runtime deps
+      # Double-tag: both SHA and latest
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ steps.meta.outputs.tags }} \
+            -t ${{ steps.meta.outputs.latest }} \
+            .
+
+      # Scan the BUILT container image for vulnerabilities
+      # This catches issues in base images and installed packages
+      # that filesystem scanning (Job 3) might miss
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          ignore-unfixed: true
+
+      # Push both tags to ECR
+      # EKS will pull the SHA-tagged image (more reliable than :latest)
+      - name: Push to ECR
+        run: |
+          docker push ${{ steps.meta.outputs.tags }}
+          docker push ${{ steps.meta.outputs.latest }}
+
+  # ════════════════════════════════════════════════════════════════════
+  # JOB 5: UPDATE K8s MANIFESTS (GitOps Trigger)
+  # ════════════════════════════════════════════════════════════════════
+  # THIS IS THE HEART OF GITOPS:
+  # 
+  # This job updates the image tag in k8s/deployment.yaml to point to
+  # the newly built Docker image. When this change is committed and
+  # pushed back to the repository, ArgoCD detects it and automatically
+  # deploys the new version to the EKS cluster.
+  #
+  # Flow: Updated deployment.yaml → Git push → ArgoCD sync → EKS update
+  #
+  # This means the Git repository is ALWAYS the single source of truth
+  # for what's running on the cluster.
+  update-k8s:
+    name: 🔄 Update K8s Manifests (Trigger ArgoCD)
+    runs-on: ubuntu-latest
+    needs: [build-and-push]    # Only after image is pushed to ECR
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Need write access to push changes
+
+      # Need ECR login to get the full registry URL for the image reference
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Use sed to replace the image line in deployment.yaml
+      # Before: image: 735395977162.dkr.ecr.ap-south-1.amazonaws.com/mlops-sentiment-api:old-sha
+      # After:  image: 735395977162.dkr.ecr.ap-south-1.amazonaws.com/mlops-sentiment-api:new-sha
+      - name: Update deployment image tag
+        run: |
+          NEW_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
+          echo "Updating image to: ${NEW_IMAGE}"
+          sed -i "s|image: .*|image: ${NEW_IMAGE}|g" k8s/deployment.yaml
+
+      # Commit the updated deployment.yaml back to the repo
+      # The "git diff --cached --quiet ||" ensures we only commit if there are actual changes
+      # Using [bot] identity to distinguish CI commits from developer commits
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/deployment.yaml
+          git diff --cached --quiet || {
+            git commit -m "ci: update image tag to ${{ github.sha }}"
+            git push
+          }
