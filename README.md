@@ -739,6 +739,24 @@ Prometheus automatically discovers and scrapes pods via the `ServiceMonitor`:
  
  ---
  
+## ✅ Project Success & Validation
+
+### 🟢 Automated CI/CD Pipeline
+The entire pipeline (Lint -> Test -> Security -> Build -> Deploy) is fully automated with GitHub Actions.
+![CI Success](docs/screenshots/github_actions_ci_success.png)
+
+### 🟢 Terminal API Validation
+Inference results showing high-confidence sentiment predictions via `curl`.
+![Terminal API Positive](docs/screenshots/terminal_api_test_positive.png)
+![Terminal API Negative](docs/screenshots/terminal_api_test_negative.png)
+
+### 🟢 Interactive AI Web GUI
+The final "Nexus AI" interface in action, designed by **Ajay Autade**.
+![GUI Positive](docs/screenshots/gui_sentiment_positive_example.png)
+![GUI Negative](docs/screenshots/gui_sentiment_negative_example.png)
+
+---
+
 ## 📸 Infrastructure Screenshots
 
 ### AWS EKS Cluster
